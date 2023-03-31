@@ -1,0 +1,11 @@
+{
+  "name": "airtableTest",
+  "id": "1223465275834599114",
+  "api": "1.0.0",
+  "main": "code.js",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "editorType": [
+    "figma"
+  ]
+}
