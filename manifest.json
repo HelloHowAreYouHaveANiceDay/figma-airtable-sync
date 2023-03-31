@@ -2,7 +2,8 @@
   "name": "airtableTest",
   "id": "1223465275834599114",
   "api": "1.0.0",
-  "main": "code.js",
+  "main": "code.js", 
+  "ui": "ui.html",
   "capabilities": [],
   "enableProposedApi": false,
   "editorType": [

@@ -1,0 +1,17 @@
+<html>
+    Hello World
+    <button>hello</button>
+</html>
+
+<script>
+    var button = document.querySelector('button');
+    button.addEventListener('click', function() {
+        parent.postMessage({
+            pluginMessage: 'Hello World'
+        }, '*');
+    });
+
+    onmessage = event => {
+        console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
+    };
+</script>
