@@ -26,6 +26,11 @@ figma.ui.onmessage = async (msg) => {
   });
 }
 
+// Figma Airtable Sync
+
+
+
+
 // async function script() {
 //   let nodes: SceneNode[] = [];
 //   // Define a recursive function to get all child nodes
