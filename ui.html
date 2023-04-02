@@ -1,17 +1,35 @@
 <html>
     Hello World
-    <button>hello</button>
+    <button id="hello">hello</button>
+    <button id="sync-up">Sync Up</button>
 </html>
 
 <script>
-    var button = document.querySelector('button');
+    var button = document.getElementById('hello');
     button.addEventListener('click', function() {
         parent.postMessage({
-            pluginMessage: 'Hello World'
+            pluginMessage: {
+                type: 'hello',
+                data: 'hello world'
+            }
         }, '*');
     });
 
-    onmessage = event => {
+    const syncButton = document.getElementById('sync-up');
+    syncButton.addEventListener('click', function() {
+        parent.postMessage({
+            pluginMessage: {
+                type: 'sync-up'
+            },
+        }, '*');
+    });
+
+   onmessage = async (event) => {
+    try {
         console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
+    }catch (err) {
+        console.error(err)
+    }
     };
+    console.log('UI loaded')
 </script>

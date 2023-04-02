@@ -21,88 +21,143 @@ console.log("START");
 
 figma.ui.onmessage = async (msg) => {
   console.log('passed', msg);
+  if (msg.type === 'sync-up') {
+    await script();
+    figma.ui.postMessage('sync complete')
+  }
+
+
   figma.ui.postMessage({
-    pluginMessage: 'Hello Response'
+    pluginMessage: 'hello from code.ts'
+    // getUrl(baseId, tableName)
   });
 }
 
-// Figma Airtable Sync
 
 
 
+async function script() {
+  let nodes: SceneNode[] = [];
+  // Define a recursive function to get all child nodes
+  function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
+    // Iterate over all nodes in the array
+    nodes.forEach((node) => {
+      // Add the current node to the result array
+      result.push(node);
 
-// async function script() {
-//   let nodes: SceneNode[] = [];
-//   // Define a recursive function to get all child nodes
-//   function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
-//     // Iterate over all nodes in the array
-//     nodes.forEach((node) => {
-//       // Add the current node to the result array
-//       result.push(node);
+      // If the current node is a container (e.g. a frame or group), recurse on its children
+      //@ts-ignore
+      if (node.children) {
+        //@ts-ignore
+        getAllChildNodes(node.children, result);
+      }
+    });
+  }
 
-//       // If the current node is a container (e.g. a frame or group), recurse on its children
-//       //@ts-ignore
-//       if (node.children) {
-//         //@ts-ignore
-//         getAllChildNodes(node.children, result);
-//       }
-//     });
-//   }
+  // Get the currently active page
+  const currentPage = figma.currentPage;
 
-//   debugger;
+  nodes = figma.currentPage.children.map((n) => n); // Replace with your own array of SceneNodes
+  const allNodes: SceneNode[] = [];
+  getAllChildNodes(nodes, allNodes);
 
-//   // Get the currently active page
-//   const currentPage = figma.currentPage;
+  const recordData = allNodes.map((n) => ({
+    fields: {
+      figma_id: n.id,
+      name: n.name,
+      type: n.type,
+      x: n.x,
+      y: n.y,
+      width: n.width,
+      height: n.height,
+    },
+  }));
 
-//   nodes = figma.currentPage.children.map((n) => n); // Replace with your own array of SceneNodes
-//   const allNodes: SceneNode[] = [];
-//   getAllChildNodes(nodes, allNodes);
-//   console.log(
-//     allNodes.map((n) => ({
-//       id: n.id,
-//       name: n.name,
-//     }))
-//   );
+  // airtable batch requests are limited to 10 records per request
+  // create a batch of 10 records
+  const batches = [];
+  let i, j, tempBatch;
+  for (i = 0, j = recordData.length; i < j; i += 10) {
+    tempBatch = recordData.slice(i, i + 10);
+    batches.push(tempBatch);
+  }
+  // create a batch request for each batch of records
+  for (let k = 0; k < batches.length; k++) {
+    const batchData = {
+      // airtable allows an upsert operation
+      performUpsert: {
+        fieldsToMergeOn: ['figma_id']
+      },
+      "records": batches[k]
+    };
+    console.log('upserting ' + batchData)
+    const createUrl = `https://api.airtable.com/v0/${baseId}/${tableName}`;
+    const createResponse = await fetch(createUrl, {
+      method: 'PATCH',
+      headers: headers,
+      body: JSON.stringify(batchData)
+    });
+    const createData = await createResponse.json();
+    console.log(createData);
+  }
 
-//   const recordData = allNodes.map((n) => ({
-//     fields: {
-//       figma_id: n.id,
-//       name: n.name,
-//     },
-//   }));
+  // Log the names of all frames in the page
+  // frames.forEach(frame => console.log(frame.name + '' + frame.type));
 
-//   const batches = [];
-//   let i, j, tempBatch;
-//   for (i = 0, j = recordData.length; i < j; i += 10) {
-//     tempBatch = recordData.slice(i, i + 10);
-//     batches.push(tempBatch);
-//   }
-//   // create a batch request for each batch of records
-//   for (let k = 0; k < batches.length; k++) {
-//     const batchData = {
-//       "records": batches[k]
-//     };
-//     const createUrl = `https://api.airtable.com/v0/${baseId}/${tableName}`;
-//     const createResponse = await fetch(createUrl, {
-//       method: 'POST',
-//       headers: headers,
-//       body: JSON.stringify(batchData)
-//     });
-//     const createData = await createResponse.json();
-//     console.log(createData);
-//   }
+  console.log("END");
+  // figma.currentPage.selection = nodes;
+  // figma.viewport.scrollAndZoomIntoView(nodes);
 
-//   // Log the names of all frames in the page
-//   // frames.forEach(frame => console.log(frame.name + '' + frame.type));
-
-//   console.log("END");
-//   // figma.currentPage.selection = nodes;
-//   // figma.viewport.scrollAndZoomIntoView(nodes);
-
-//   // Make sure to close the plugin when you're done. Otherwise the plugin will
-//   // keep running, which shows the cancel button at the bottom of the screen.
-//   figma.closePlugin();
-// }
-
-// script();
+  // Make sure to close the plugin when you're done. Otherwise the plugin will
+  // keep running, which shows the cancel button at the bottom of the screen.
+}
 console.log("END");
+
+
+
+// const AIRTABLE_ROOT_URL = 'https://api.airtable.com/v0';
+
+// const getUrl = (
+//   base: string,
+//   table: string,
+//   fields?: string[],
+//   maxRecords?: number,
+//   filterByFormula?: string,
+//   pageSize?: number,
+//   sort?: string[],
+//   view?: string,
+//   offset?: string
+// ) => {
+//     const url = `${AIRTABLE_ROOT_URL}/${base}/${table}`;
+//     const params = new URLSearchParams();
+//     if (fields) {
+//         params.append('fields', fields.join(','));
+//     }
+//     if (maxRecords) {
+//         params.append('maxRecords', maxRecords.toString());
+//     }
+//     if (filterByFormula) {
+//         params.append('filterByFormula', filterByFormula);
+//     }
+//     if (pageSize) {
+//         params.append('pageSize', pageSize.toString());
+//     }
+//     if (sort) {
+//         params.append('sort', sort.join(','));
+//     }
+//     if (view) {
+//         params.append('view', view);
+//     }
+//     if (offset) {
+//         params.append('offset', offset);
+//     }
+//     return `${url}?${params.toString()}`;
+// };
+
+
+// get all records from a table
+
+// get records from a table
+
+// patch records to a table
+
