@@ -1,15 +1,7 @@
 console.log("SCRIPT BEGINS");
-// RESET TOKEN
-const AIRTABLE_PERSONAL_ACCESS_TOKEN =
-  "patX3r2kZAeZ3RVsv.2b403ecb6cac0a9be0d04b3933583a7573d8f7b411b66be77ad71bd5a9059cbd";
-const baseId = "appCrmeg3nF3WOVFr";
-const tableName = "Nodes";
-const headers = {
-  Authorization: `Bearer ${AIRTABLE_PERSONAL_ACCESS_TOKEN}`,
-  "Content-Type": "application/json",
-};
 
-figma.showUI(__html__, {width: 200, height: 200});
+
+figma.showUI(__html__, { width: 200, height: 200 });
 
 // import * as Airtable from "./node_modules/airtable/lib/airtable";
 // const AirtableBase = new Airtable({apiKey: AIRTABLE_PERSONAL_ACCESS_TOKEN}).base('appCrmeg3nF3WOVFr')
@@ -21,8 +13,9 @@ console.log("START");
 
 figma.ui.onmessage = async (msg) => {
   console.log('passed', msg);
-  if (msg.type === 'sync-up') {
-    await script();
+  if (msg.type === 'sync') {
+    console.log(msg)
+    await script(msg.data.pat, msg.data.baseid, msg.data.tableid);
     figma.ui.postMessage('sync complete')
   }
 
@@ -32,6 +25,25 @@ figma.ui.onmessage = async (msg) => {
     // getUrl(baseId, tableName)
   });
 }
+
+function sendUiError(msg: string) {
+  figma.ui.postMessage({
+    pluginMessage: {
+      type: 'error',
+      data: msg
+    }
+  });
+}
+
+function sendUiMessage(msg: string) {
+  figma.ui.postMessage({
+    pluginMessage: {
+      type: 'message',
+      data: msg
+    }
+  });
+}
+
 
 
 // On Error
@@ -48,29 +60,11 @@ figma.ui.onmessage = async (msg) => {
 
 // End Sync
 
-async function script() {
+async function script(pat: string, baseId: string, tableId: string) {
   let nodes: SceneNode[] = [];
-  // Define a recursive function to get all child nodes
-  function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
-    // Iterate over all nodes in the array
-    nodes.forEach((node) => {
-      // Add the current node to the result array
-      result.push(node);
-
-      // If the current node is a container (e.g. a frame or group), recurse on its children
-      //@ts-ignore
-      if (node.children) {
-        //@ts-ignore
-        getAllChildNodes(node.children, result);
-      }
-    });
-  }
-
-  // Get the currently active page
-  const currentPage = figma.currentPage;
-
-  nodes = figma.currentPage.children.map((n) => n); // Replace with your own array of SceneNodes
   const allNodes: SceneNode[] = [];
+  
+  nodes = figma.currentPage.children.map((n) => n);
   getAllChildNodes(nodes, allNodes);
 
   const recordData = allNodes.map((n) => ({
@@ -103,7 +97,11 @@ async function script() {
       "records": batches[k]
     };
     console.log('upserting ' + batchData)
-    const createUrl = `https://api.airtable.com/v0/${baseId}/${tableName}`;
+    const headers = {
+      Authorization: `Bearer ${pat}`,
+      "Content-Type": "application/json",
+    };
+    const createUrl = `https://api.airtable.com/v0/${baseId}/${tableId}`;
     const createResponse = await fetch(createUrl, {
       method: 'PATCH',
       headers: headers,
@@ -113,12 +111,7 @@ async function script() {
     console.log(createData);
   }
 
-  // Log the names of all frames in the page
-  // frames.forEach(frame => console.log(frame.name + '' + frame.type));
-
   console.log("END");
-  // figma.currentPage.selection = nodes;
-  // figma.viewport.scrollAndZoomIntoView(nodes);
 
   // Make sure to close the plugin when you're done. Otherwise the plugin will
   // keep running, which shows the cancel button at the bottom of the screen.
@@ -126,45 +119,21 @@ async function script() {
 console.log("END");
 
 
+// Define a recursive function to get all child nodes
+function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
+  // Iterate over all nodes in the array
+  nodes.forEach((node) => {
+    // Add the current node to the result array
+    result.push(node);
 
-// const AIRTABLE_ROOT_URL = 'https://api.airtable.com/v0';
-
-// const getUrl = (
-//   base: string,
-//   table: string,
-//   fields?: string[],
-//   maxRecords?: number,
-//   filterByFormula?: string,
-//   pageSize?: number,
-//   sort?: string[],
-//   view?: string,
-//   offset?: string
-// ) => {
-//     const url = `${AIRTABLE_ROOT_URL}/${base}/${table}`;
-//     const params = new URLSearchParams();
-//     if (fields) {
-//         params.append('fields', fields.join(','));
-//     }
-//     if (maxRecords) {
-//         params.append('maxRecords', maxRecords.toString());
-//     }
-//     if (filterByFormula) {
-//         params.append('filterByFormula', filterByFormula);
-//     }
-//     if (pageSize) {
-//         params.append('pageSize', pageSize.toString());
-//     }
-//     if (sort) {
-//         params.append('sort', sort.join(','));
-//     }
-//     if (view) {
-//         params.append('view', view);
-//     }
-//     if (offset) {
-//         params.append('offset', offset);
-//     }
-//     return `${url}?${params.toString()}`;
-// };
+    // If the current node is a container (e.g. a frame or group), recurse on its children
+    //@ts-ignore property 'children' does not exist on type 'SceneNode'
+    if (node.children) {
+      //@ts-ignore
+      getAllChildNodes(node.children, result);
+    }
+  });
+}
 
 
 // get all records from a table

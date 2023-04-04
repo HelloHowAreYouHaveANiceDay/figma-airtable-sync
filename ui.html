@@ -38,7 +38,6 @@
     <p class="pad">
         <button id="sync-up">Sync Up</button>
     </p>
-       
 
     <p>
         Personal Access Token
@@ -58,21 +57,20 @@
 </html>
 
 <script>
-    var button = document.getElementById('hello');
-    button.addEventListener('click', function () {
-        parent.postMessage({
-            pluginMessage: {
-                type: 'hello',
-                data: 'hello world'
-            }
-        }, '*');
-    });
-
     const syncButton = document.getElementById('sync-up');
     syncButton.addEventListener('click', function () {
+        const pat = document.getElementById('input-pat').value;
+        const baseid = document.getElementById('input-baseid').value;
+        const tableid = document.getElementById('input-tableid').value;
+
         parent.postMessage({
             pluginMessage: {
-                type: 'sync-up'
+                type: 'sync',
+                data: {
+                    pat: pat,
+                    baseid: baseid,
+                    tableid: tableid
+                }
             },
         }, '*');
     });
