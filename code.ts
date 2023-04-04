@@ -9,7 +9,7 @@ const headers = {
   "Content-Type": "application/json",
 };
 
-figma.showUI(__html__);
+figma.showUI(__html__, {width: 200, height: 200});
 
 // import * as Airtable from "./node_modules/airtable/lib/airtable";
 // const AirtableBase = new Airtable({apiKey: AIRTABLE_PERSONAL_ACCESS_TOKEN}).base('appCrmeg3nF3WOVFr')
@@ -34,7 +34,19 @@ figma.ui.onmessage = async (msg) => {
 }
 
 
+// On Error
+//  - send error to ui
+//  - stop syncing
 
+// Start Sync
+//  - get all nodes
+//  - upsert to airtable
+
+// Syncing
+//  - on node chage
+//  - upsert to airtable
+
+// End Sync
 
 async function script() {
   let nodes: SceneNode[] = [];

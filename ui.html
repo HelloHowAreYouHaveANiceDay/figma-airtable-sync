@@ -1,12 +1,65 @@
 <html>
-    Hello World
-    <button id="hello">hello</button>
-    <button id="sync-up">Sync Up</button>
+<style>
+    body {
+        font-family: Helvetica, sans-serif;
+        display: block;
+    }
+
+    p {
+        margin: 5;
+        font-size: 12px;
+    }
+
+    button {
+        color: var(--color-text, #333333);
+        fill: var(--color-icon, #333333);
+        border-radius: 2px;
+        cursor: default;
+        box-sizing: border-box;
+        background-clip: padding-box;
+        height: 28px;
+        border: 1px solid transparent;
+        font: inherit;
+        outline: none;
+        letter-spacing: inherit;
+        text-decoration: none;
+        display: block;
+        width: 100%;
+        font-size: 14px;
+    }
+    
+    .pad {
+        padding-top: 10;
+        padding-bottom: 15;
+    }
+</style>
+
+<div>
+    <p class="pad">
+        <button id="sync-up">Sync Up</button>
+    </p>
+       
+
+    <p>
+        Personal Access Token
+        <input id="input-pat" type="password"></input>
+    </p>
+
+    <p>
+        BaseID
+        <input id="input-baseid"></input>
+    </p>
+
+    <div class="box">
+        <p>Table <input class="input__field" id="input-tableid"></input></p>
+    </div>
+</div>
+
 </html>
 
 <script>
     var button = document.getElementById('hello');
-    button.addEventListener('click', function() {
+    button.addEventListener('click', function () {
         parent.postMessage({
             pluginMessage: {
                 type: 'hello',
@@ -16,7 +69,7 @@
     });
 
     const syncButton = document.getElementById('sync-up');
-    syncButton.addEventListener('click', function() {
+    syncButton.addEventListener('click', function () {
         parent.postMessage({
             pluginMessage: {
                 type: 'sync-up'
@@ -24,12 +77,12 @@
         }, '*');
     });
 
-   onmessage = async (event) => {
-    try {
-        console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
-    }catch (err) {
-        console.error(err)
-    }
+    onmessage = async (event) => {
+        try {
+            console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
+        } catch (err) {
+            console.error(err)
+        }
     };
     console.log('UI loaded')
 </script>
