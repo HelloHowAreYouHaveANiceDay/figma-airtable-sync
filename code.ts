@@ -1,28 +1,18 @@
-console.log("SCRIPT BEGINS");
+const debug = true;
+const debugLog = (message: any) => debug ? console.log(`plugin script: ${message}`) : null; 
+
+debugLog("start");
 
 figma.showUI(__html__, { width: 200, height: 200 });
-
 // import * as Airtable from "./node_modules/airtable/lib/airtable";
 // const AirtableBase = new Airtable({apiKey: AIRTABLE_PERSONAL_ACCESS_TOKEN}).base('appCrmeg3nF3WOVFr')
 
 // This file holds the main code for the plugins. It has access to the *document*.
 // You can access browser APIs such as the network by creating a UI which contains
 // a full browser environment (see documentation).
-console.log("START");
 
-figma.ui.onmessage = async (msg) => {
-  console.log("passed", msg);
-  if (msg.type === "sync") {
-    console.log(msg);
-    await initialUpsert(msg.data.pat, msg.data.baseid, msg.data.tableid);
-    figma.ui.postMessage("sync complete");
-  }
-
-  figma.ui.postMessage({
-    pluginMessage: "hello from code.ts",
-    // getUrl(baseId, tableName)
-  });
-};
+//@ts-ignore
+let upsertToTable: Function | null = null
 
 function sendUiError(msg: any) {
   figma.ui.postMessage({
@@ -42,29 +32,86 @@ function sendUiMessage(msg: string) {
   });
 }
 
+const storeCredentials = async (pat: string, baseId: string, tableId: string,) => {
+  try {
+    await figma.clientStorage.setAsync("AIRTABLE_CREDENTIALS", {
+      pat,
+      baseId,
+      tableId,
+    });
+    debugLog('stored credentials successfully')
+    sendUiMessage('stored airtable credentials')
+  } catch (error) {
+    debugLog('error storing credentials')
+  }
+}
+
+const getCredentials = async () => {
+  try {
+    const credentials = await figma.clientStorage.getAsync("AIRTABLE_CREDENTIALS");
+    debugLog('got credentials successfully')
+    sendUiMessage('got airtable credentials')
+    return credentials
+  } catch (error) {
+    debugLog('error getting credentials')
+  }
+}
+
+const initialize = async () => {
+  debugLog('initializing')
+  const credentials = await getCredentials();
+  figma.ui.postMessage({
+    pluginMessage: {
+      type: "credentials",
+      data: credentials,
+    },
+  });
+}
+
+figma.ui.onmessage = async (msg) => {
+  debugLog(msg);
+
+  switch (msg.type) {
+    case 'sync':
+      console.log(msg);
+      await storeCredentials(msg.data.pat, msg.data.baseId, msg.data.tableId);
+      upsertToTable = upsert(msg.data.pat, msg.data.baseId, msg.data.tableId);
+      // Start Sync
+      //  - get all nodes
+      //  - upsert to airtable
+  
+      // Syncing
+      //  - on node chage
+      //  - upsert to airtable
+      await initialUpsert(upsertToTable);
+      figma.ui.postMessage("sync complete");
+      break;
+    case 'initialize':
+      await initialize();  
+      break;
+    default:
+      break;
+  }
+};
 // On Error
 //  - send error to ui
 //  - stop syncing
 
-// Start Sync
-//  - get all nodes
-//  - upsert to airtable
-
-// Syncing
-//  - on node chage
-//  - upsert to airtable
-
 // End Sync
 
+
+// watches changes and upserts changed nodes
 figma.on("documentchange", (event) => {
-  console.log(event.documentChanges);
+  debugLog(event.documentChanges)
   event.documentChanges
     .map((r) => [r.id, r.type])
     .forEach(([id, key]) => {
       switch (key) {
         case 'PROPERTY_CHANGE':
           // get node by id
+          const node = figma.getNodeById(id);
           // upsert
+          
           break;
         
         case 'DELETE':
@@ -84,10 +131,14 @@ function getNodeById(id: string) {
   return figma.getNodeById(id);
 }
 
-async function initialUpsert(pat: string, baseId: string, tableId: string) {
+
+
+
+async function initialUpsert(upsert: Function) {
   let nodes: SceneNode[] = [];
   const allNodes: SceneNode[] = [];
 
+  debugLog("getting nodes")
   nodes = figma.currentPage.children.map((n) => n);
   getAllChildNodes(nodes, allNodes);
 
@@ -105,6 +156,7 @@ async function initialUpsert(pat: string, baseId: string, tableId: string) {
 
   // airtable batch requests are limited to 10 records per request
   // create a batch of 10 records
+  debugLog("creating batches");
   const batches = [];
   let i, j, tempBatch;
   for (i = 0, j = recordData.length; i < j; i += 10) {
@@ -120,14 +172,10 @@ async function initialUpsert(pat: string, baseId: string, tableId: string) {
       },
       records: batches[k],
     };
-    // console.log("upserting " + batchData);
-    await upsert(pat, baseId, tableId)(batchData)
+    await upsert(batchData)
   }
 
-  console.log("END");
-
-  // Make sure to close the plugin when you're done. Otherwise the plugin will
-  // keep running, which shows the cancel button at the bottom of the screen.
+  debugLog("end of initialization");
 }
 
 // return a function that accepts a an array of records
@@ -137,7 +185,8 @@ function upsert(pat: string, baseId: string, tableId: string){
     Authorization: `Bearer ${pat}`,
     "Content-Type": "application/json",
   };
-  return async function(batchData: any){    
+  return async function(batchData: any){
+    debugLog('upserting to table')
     try {
       const response = await fetch(url, {
         method: "PATCH",
@@ -155,9 +204,11 @@ function upsert(pat: string, baseId: string, tableId: string){
   }
 }
 
-console.log("END");
 
-// Define a recursive function to get all child nodes
+
+
+
+// Get all child nodes from initial array of nodes
 function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
   // Iterate over all nodes in the array
   nodes.forEach((node) => {
@@ -173,8 +224,4 @@ function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
   });
 }
 
-// get all records from a table
-
-// get records from a table
-
-// patch records to a table
+debugLog('plugin loaded')

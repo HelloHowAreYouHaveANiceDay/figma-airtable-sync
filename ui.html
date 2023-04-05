@@ -58,18 +58,19 @@
 
 <script>
     const syncButton = document.getElementById('sync-up');
+
     syncButton.addEventListener('click', function () {
         const pat = document.getElementById('input-pat').value;
-        const baseid = document.getElementById('input-baseid').value;
-        const tableid = document.getElementById('input-tableid').value;
+        const baseId = document.getElementById('input-baseid').value;
+        const tableId = document.getElementById('input-tableid').value;
 
         parent.postMessage({
             pluginMessage: {
                 type: 'sync',
                 data: {
                     pat: pat,
-                    baseid: baseid,
-                    tableid: tableid
+                    baseId: baseId,
+                    tableId: tableId
                 }
             },
         }, '*');
@@ -77,20 +78,31 @@
 
     onmessage = async (event) => {
         try {
-           
-            switch (event.type) {
+            switch (event.data.pluginMessage.pluginMessage.type) {
                 case 'message':
+                    console.log('message')
                     console.log(`update ${event.data.pluginMessage.pluginMessage.data}`)
                     break;
                 case 'error':
-                    console.error(`error ${event.data.pluginMessage.pluginMessage.data}`)
+                    console.log('error')
+                    console.log(`error ${event.data.pluginMessage.pluginMessage.data}`)
+                    break;
+                case 'credentials':
+                    console.log('credentials')
+                    document.getElementById('input-pat').value = event.data.pluginMessage.pluginMessage.data.pat;
+                    document.getElementById('input-baseid').value = event.data.pluginMessage.pluginMessage.data.baseId;
+                    document.getElementById('input-tableid').value = event.data.pluginMessage.pluginMessage.data.tableId;
+                    break;
                 default:
-                    console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
+                    console.log('untyped')
+                    console.log('untyped message: ', event.data.pluginMessage.pluginMessage)
                     break;
             }
         } catch (err) {
             console.error(err)
         }
     };
+
+    parent.postMessage({ pluginMessage: { type: 'initialize' } }, '*')
     console.log('UI loaded')
 </script>
