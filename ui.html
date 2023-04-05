@@ -77,7 +77,17 @@
 
     onmessage = async (event) => {
         try {
-            console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
+           
+            switch (event.type) {
+                case 'message':
+                    console.log(`update ${event.data.pluginMessage.pluginMessage.data}`)
+                    break;
+                case 'error':
+                    console.error(`error ${event.data.pluginMessage.pluginMessage.data}`)
+                default:
+                    console.log('Hello from the parent!', event.data.pluginMessage.pluginMessage)
+                    break;
+            }
         } catch (err) {
             console.error(err)
         }

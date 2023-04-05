@@ -1,6 +1,5 @@
 console.log("SCRIPT BEGINS");
 
-
 figma.showUI(__html__, { width: 200, height: 200 });
 
 // import * as Airtable from "./node_modules/airtable/lib/airtable";
@@ -12,39 +11,36 @@ figma.showUI(__html__, { width: 200, height: 200 });
 console.log("START");
 
 figma.ui.onmessage = async (msg) => {
-  console.log('passed', msg);
-  if (msg.type === 'sync') {
-    console.log(msg)
-    await script(msg.data.pat, msg.data.baseid, msg.data.tableid);
-    figma.ui.postMessage('sync complete')
+  console.log("passed", msg);
+  if (msg.type === "sync") {
+    console.log(msg);
+    await initialUpsert(msg.data.pat, msg.data.baseid, msg.data.tableid);
+    figma.ui.postMessage("sync complete");
   }
 
-
   figma.ui.postMessage({
-    pluginMessage: 'hello from code.ts'
+    pluginMessage: "hello from code.ts",
     // getUrl(baseId, tableName)
   });
-}
+};
 
-function sendUiError(msg: string) {
+function sendUiError(msg: any) {
   figma.ui.postMessage({
     pluginMessage: {
-      type: 'error',
-      data: msg
-    }
+      type: "error",
+      data: msg,
+    },
   });
 }
 
 function sendUiMessage(msg: string) {
   figma.ui.postMessage({
     pluginMessage: {
-      type: 'message',
-      data: msg
-    }
+      type: "message",
+      data: msg,
+    },
   });
 }
-
-
 
 // On Error
 //  - send error to ui
@@ -60,10 +56,38 @@ function sendUiMessage(msg: string) {
 
 // End Sync
 
-async function script(pat: string, baseId: string, tableId: string) {
+figma.on("documentchange", (event) => {
+  console.log(event.documentChanges);
+  event.documentChanges
+    .map((r) => [r.id, r.type])
+    .forEach(([id, key]) => {
+      switch (key) {
+        case 'PROPERTY_CHANGE':
+          // get node by id
+          // upsert
+          break;
+        
+        case 'DELETE':
+          // delete record by id
+          break;
+        // case 'CREATE':
+        // create is always followed by a property change
+        //   break;
+        default:
+          break;
+      }
+      console.log("document change");
+    });
+});
+
+function getNodeById(id: string) {
+  return figma.getNodeById(id);
+}
+
+async function initialUpsert(pat: string, baseId: string, tableId: string) {
   let nodes: SceneNode[] = [];
   const allNodes: SceneNode[] = [];
-  
+
   nodes = figma.currentPage.children.map((n) => n);
   getAllChildNodes(nodes, allNodes);
 
@@ -92,23 +116,12 @@ async function script(pat: string, baseId: string, tableId: string) {
     const batchData = {
       // airtable allows an upsert operation
       performUpsert: {
-        fieldsToMergeOn: ['figma_id']
+        fieldsToMergeOn: ["figma_id"],
       },
-      "records": batches[k]
+      records: batches[k],
     };
-    console.log('upserting ' + batchData)
-    const headers = {
-      Authorization: `Bearer ${pat}`,
-      "Content-Type": "application/json",
-    };
-    const createUrl = `https://api.airtable.com/v0/${baseId}/${tableId}`;
-    const createResponse = await fetch(createUrl, {
-      method: 'PATCH',
-      headers: headers,
-      body: JSON.stringify(batchData)
-    });
-    const createData = await createResponse.json();
-    console.log(createData);
+    // console.log("upserting " + batchData);
+    await upsert(pat, baseId, tableId)(batchData)
   }
 
   console.log("END");
@@ -116,8 +129,33 @@ async function script(pat: string, baseId: string, tableId: string) {
   // Make sure to close the plugin when you're done. Otherwise the plugin will
   // keep running, which shows the cancel button at the bottom of the screen.
 }
-console.log("END");
 
+// return a function that accepts a an array of records
+function upsert(pat: string, baseId: string, tableId: string){
+  const url = `https://api.airtable.com/v0/${baseId}/${tableId}`;
+  const headers = {
+    Authorization: `Bearer ${pat}`,
+    "Content-Type": "application/json",
+  };
+  return async function(batchData: any){    
+    try {
+      const response = await fetch(url, {
+        method: "PATCH",
+        headers: headers,
+        body: JSON.stringify(batchData),
+      });
+      if(!response.ok){
+        throw new Error(response.statusText)
+      }
+      sendUiMessage(`${batchData.records.length} records upserted`)
+    } catch (error) {
+      sendUiError(error);
+    }
+ 
+  }
+}
+
+console.log("END");
 
 // Define a recursive function to get all child nodes
 function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
@@ -135,10 +173,8 @@ function getAllChildNodes(nodes: SceneNode[], result: SceneNode[]) {
   });
 }
 
-
 // get all records from a table
 
 // get records from a table
 
 // patch records to a table
-
