@@ -1,5 +1,5 @@
 const debug = true;
-const debugLog = (message: any) => debug ? console.log(`plugin script: ${message}`) : null; 
+const debugLog = (message: any) => debug ? console.log(`plugin script: ${message}`) : null;
 
 debugLog("start");
 
@@ -11,8 +11,7 @@ figma.showUI(__html__, { width: 200, height: 200 });
 // You can access browser APIs such as the network by creating a UI which contains
 // a full browser environment (see documentation).
 
-//@ts-ignore
-let upsertToTable: Function | null = null
+let upsertToTable: Function
 
 function sendUiError(msg: any) {
   figma.ui.postMessage({
@@ -79,7 +78,7 @@ figma.ui.onmessage = async (msg) => {
       // Start Sync
       //  - get all nodes
       //  - upsert to airtable
-  
+
       // Syncing
       //  - on node chage
       //  - upsert to airtable
@@ -87,7 +86,7 @@ figma.ui.onmessage = async (msg) => {
       figma.ui.postMessage("sync complete");
       break;
     case 'initialize':
-      await initialize();  
+      await initialize();
       break;
     default:
       break;
@@ -109,13 +108,21 @@ figma.on("documentchange", (event) => {
       switch (key) {
         case 'PROPERTY_CHANGE':
           // get node by id
-          const node = figma.getNodeById(id);
+          const node = figma.currentPage.findOne((n) => n.id === id);
           // upsert
-          
+          //@ts-ignore - node should exist if we get a change
+          upsertToTable([mapNodeToRecord(node)])
           break;
-        
+
         case 'DELETE':
-          // delete record by id
+          //@ts-ignore
+          const withStatus = {
+            fields: {
+              'figma_id': id,
+              'sync_status': 'deleted'
+            }
+          }
+          upsertToTable([withStatus])
           break;
         // case 'CREATE':
         // create is always followed by a property change
@@ -127,12 +134,6 @@ figma.on("documentchange", (event) => {
     });
 });
 
-function getNodeById(id: string) {
-  return figma.getNodeById(id);
-}
-
-
-
 
 async function initialUpsert(upsert: Function) {
   let nodes: SceneNode[] = [];
@@ -142,65 +143,72 @@ async function initialUpsert(upsert: Function) {
   nodes = figma.currentPage.children.map((n) => n);
   getAllChildNodes(nodes, allNodes);
 
-  const recordData = allNodes.map((n) => ({
-    fields: {
-      figma_id: n.id,
-      name: n.name,
-      type: n.type,
-      x: n.x,
-      y: n.y,
-      width: n.width,
-      height: n.height,
-    },
-  }));
-
+  const recordData = allNodes.map(mapNodeToRecord);
+  upsertToTable(recordData);
   // airtable batch requests are limited to 10 records per request
   // create a batch of 10 records
-  debugLog("creating batches");
-  const batches = [];
-  let i, j, tempBatch;
-  for (i = 0, j = recordData.length; i < j; i += 10) {
-    tempBatch = recordData.slice(i, i + 10);
-    batches.push(tempBatch);
-  }
+
   // create a batch request for each batch of records
-  for (let k = 0; k < batches.length; k++) {
-    const batchData = {
-      // airtable allows an upsert operation
-      performUpsert: {
-        fieldsToMergeOn: ["figma_id"],
-      },
-      records: batches[k],
-    };
-    await upsert(batchData)
-  }
+
 
   debugLog("end of initialization");
 }
 
+function mapNodeToRecord(node: SceneNode) {
+  debugLog(`mapping ${node}`)
+  return ({
+    fields: {
+      figma_id: node.id,
+      name: node.name,
+      type: node.type,
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+      sync_status: "active",
+    }
+  })
+}
+
 // return a function that accepts a an array of records
-function upsert(pat: string, baseId: string, tableId: string){
+function upsert(pat: string, baseId: string, tableId: string) {
   const url = `https://api.airtable.com/v0/${baseId}/${tableId}`;
   const headers = {
     Authorization: `Bearer ${pat}`,
     "Content-Type": "application/json",
   };
-  return async function(batchData: any){
+  return async function (recordData: any) {
     debugLog('upserting to table')
     try {
-      const response = await fetch(url, {
-        method: "PATCH",
-        headers: headers,
-        body: JSON.stringify(batchData),
-      });
-      if(!response.ok){
-        throw new Error(response.statusText)
+      debugLog("creating batches");
+      const batches = [];
+      let i, j, tempBatch;
+      for (i = 0, j = recordData.length; i < j; i += 10) {
+        tempBatch = recordData.slice(i, i + 10);
+        batches.push(tempBatch);
       }
-      sendUiMessage(`${batchData.records.length} records upserted`)
+      for (let k = 0; k < batches.length; k++) {
+        const batchData = {
+          // airtable allows an upsert operation
+          performUpsert: {
+            fieldsToMergeOn: ["figma_id"],
+          },
+          records: batches[k],
+        };
+        const response = await fetch(url, {
+          method: "PATCH",
+          headers: headers,
+          body: JSON.stringify(batchData),
+        });
+        if (!response.ok) {
+          throw new Error(response.statusText)
+        }
+        sendUiMessage(`${batchData.records.length} records upserted`)
+      }
     } catch (error) {
       sendUiError(error);
     }
- 
+
   }
 }
 

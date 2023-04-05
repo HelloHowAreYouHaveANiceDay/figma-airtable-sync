@@ -57,6 +57,7 @@
 </html>
 
 <script>
+    // Initialize the sync
     const syncButton = document.getElementById('sync-up');
 
     syncButton.addEventListener('click', function () {
@@ -75,6 +76,10 @@
             },
         }, '*');
     });
+
+    // after this the plugin should be watching changes and upserting them
+
+    // end sync
 
     onmessage = async (event) => {
         try {
