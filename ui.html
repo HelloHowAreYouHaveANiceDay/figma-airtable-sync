@@ -27,18 +27,22 @@
         width: 100%;
         font-size: 14px;
     }
-    
+
     .pad {
         padding-top: 10;
         padding-bottom: 15;
+    }
+
+    .is-hidden {
+        display: none;
     }
 </style>
 
 <div>
     <p class="pad">
         <button id="sync-up">Sync Up</button>
+        <button id="unsync" class="is-hidden">Syncing...</button>
     </p>
-
     <p>
         Personal Access Token
         <input id="input-pat" type="password"></input>
@@ -46,20 +50,26 @@
 
     <p>
         BaseID
-        <input id="input-baseid"></input>
+        <input id="input-baseid" type="password"></input>
     </p>
 
     <div class="box">
         <p>Table <input class="input__field" id="input-tableid"></input></p>
     </div>
+
 </div>
 
-</html>
+
 
 <script>
-    // Initialize the sync
-    const syncButton = document.getElementById('sync-up');
+    // shitty debug logging
+    const debug = false;
+    const debugLog = (message) => debug ? console.log(`plugin script: ${message}`) : null;
 
+    let isSyncing = false
+
+    // Initiate the figma > airtable sync
+    const syncButton = document.getElementById('sync-up');
     syncButton.addEventListener('click', function () {
         const pat = document.getElementById('input-pat').value;
         const baseId = document.getElementById('input-baseid').value;
@@ -75,31 +85,52 @@
                 }
             },
         }, '*');
+        // after this the plugin should be watching changes and upserting them to airtable
+        isSyncing = true
+        toggleSyncButton()
     });
 
-    // after this the plugin should be watching changes and upserting them
+    const unsyncButton = document.getElementById('unsync');
+    unsyncButton.addEventListener('click', function () {
+        parent.postMessage({
+            pluginMessage: {
+                type: 'unsync',
+            },
+        }, '*');
+        isSyncing = false
+        toggleSyncButton()
+    });
 
-    // end sync
+    function toggleSyncButton() {
+        if (isSyncing) {
+            document.getElementById('unsync').classList.remove('is-hidden')
+            document.getElementById('sync-up').classList.add('is-hidden')
+        } else {
+            document.getElementById('unsync').classList.add('is-hidden')
+            document.getElementById('sync-up').classList.remove('is-hidden')
+        }
+    }
 
+    // handle messages coming from the plugin
     onmessage = async (event) => {
         try {
             switch (event.data.pluginMessage.pluginMessage.type) {
                 case 'message':
-                    console.log('message')
+                    debugLog('message')
                     console.log(`update ${event.data.pluginMessage.pluginMessage.data}`)
                     break;
                 case 'error':
-                    console.log('error')
+                    debugLog('error')
                     console.log(`error ${event.data.pluginMessage.pluginMessage.data}`)
                     break;
                 case 'credentials':
-                    console.log('credentials')
+                    debugLog('credentials')
                     document.getElementById('input-pat').value = event.data.pluginMessage.pluginMessage.data.pat;
                     document.getElementById('input-baseid').value = event.data.pluginMessage.pluginMessage.data.baseId;
                     document.getElementById('input-tableid').value = event.data.pluginMessage.pluginMessage.data.tableId;
                     break;
                 default:
-                    console.log('untyped')
+                    debugLog('untyped')
                     console.log('untyped message: ', event.data.pluginMessage.pluginMessage)
                     break;
             }
@@ -108,6 +139,9 @@
         }
     };
 
+    // tell the plugin that the UI is loaded, so it can try to load store credentials if they exist.
     parent.postMessage({ pluginMessage: { type: 'initialize' } }, '*')
-    console.log('UI loaded')
+    debugLog('UI loaded')
 </script>
+
+</html>

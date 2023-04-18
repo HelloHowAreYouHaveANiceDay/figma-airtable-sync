@@ -1,18 +1,25 @@
-const debug = true;
-const debugLog = (message: any) => debug ? console.log(`plugin script: ${message}`) : null;
-
-debugLog("start");
-
-figma.showUI(__html__, { width: 200, height: 200 });
-// import * as Airtable from "./node_modules/airtable/lib/airtable";
-// const AirtableBase = new Airtable({apiKey: AIRTABLE_PERSONAL_ACCESS_TOKEN}).base('appCrmeg3nF3WOVFr')
 
 // This file holds the main code for the plugins. It has access to the *document*.
 // You can access browser APIs such as the network by creating a UI which contains
 // a full browser environment (see documentation).
 
-let upsertToTable: Function
 
+// shitty debug logging
+const debug = false;
+const debugLog = (message: any) => debug ? console.log(`plugin script: ${message}`) : null;
+
+debugLog("start");
+
+figma.showUI(__html__, { width: 200, height: 200 });
+
+let upsertToTable: Function
+let isSyncing: boolean = false;
+
+/**
+ * Posts an error to the ui
+ * 
+ * @param msg - message to send to ui
+ */
 function sendUiError(msg: any) {
   figma.ui.postMessage({
     pluginMessage: {
@@ -22,6 +29,11 @@ function sendUiError(msg: any) {
   });
 }
 
+/**
+ * Posts a message to the ui
+ * 
+ * @param msg - message to send to ui
+ */
 function sendUiMessage(msg: string) {
   figma.ui.postMessage({
     pluginMessage: {
@@ -31,6 +43,13 @@ function sendUiMessage(msg: string) {
   });
 }
 
+/**
+ * Store airtable credentials in client storage
+ * 
+ * @param pat - personal access token
+ * @param baseId - base id
+ * @param tableId - table id
+ */
 const storeCredentials = async (pat: string, baseId: string, tableId: string,) => {
   try {
     await figma.clientStorage.setAsync("AIRTABLE_CREDENTIALS", {
@@ -45,6 +64,12 @@ const storeCredentials = async (pat: string, baseId: string, tableId: string,) =
   }
 }
 
+/**
+ * NOTE: NOT SECURE
+ * gets credentials from client storage
+ * 
+ * @returns credentials from client storage
+ */
 const getCredentials = async () => {
   try {
     const credentials = await figma.clientStorage.getAsync("AIRTABLE_CREDENTIALS");
@@ -56,6 +81,11 @@ const getCredentials = async () => {
   }
 }
 
+
+/**
+ * NOTE: NOT SECURE
+ * On load, get credentials from client storage and send to ui
+ */
 const initialize = async () => {
   debugLog('initializing')
   const credentials = await getCredentials();
@@ -67,6 +97,11 @@ const initialize = async () => {
   });
 }
 
+/**
+ * Handles messages from the ui. Kicks off plugin functions.
+ * 
+ * @param msg - message from ui
+ */
 figma.ui.onmessage = async (msg) => {
   debugLog(msg);
 
@@ -78,13 +113,25 @@ figma.ui.onmessage = async (msg) => {
       // Start Sync
       //  - get all nodes
       //  - upsert to airtable
+      await initialUpsert(upsertToTable);
 
       // Syncing
       //  - on node chage
+      isSyncing = true;
+      // watches changes and upserts changed nodes
+      figma.on("documentchange", upsertOnChange);
       //  - upsert to airtable
-      await initialUpsert(upsertToTable);
-      figma.ui.postMessage("sync complete");
+      figma.ui.postMessage({
+        pluginMessage: {
+          type: 'message',
+          data: 'syncing with airtable'
+        }
+      });
       break;
+    case 'unsync':
+      debugLog('unsyncing')
+      isSyncing = false;
+      figma.off("documentchange", upsertOnChange);
     case 'initialize':
       await initialize();
       break;
@@ -92,16 +139,12 @@ figma.ui.onmessage = async (msg) => {
       break;
   }
 };
-// On Error
-//  - send error to ui
-//  - stop syncing
-
-// End Sync
 
 
-// watches changes and upserts changed nodes
-figma.on("documentchange", (event) => {
+
+function upsertOnChange(event: DocumentChangeEvent) {
   debugLog(event.documentChanges)
+  if(!isSyncing) return;
   event.documentChanges
     .map((r) => [r.id, r.type])
     .forEach(([id, key]) => {
@@ -132,7 +175,7 @@ figma.on("documentchange", (event) => {
       }
       console.log("document change");
     });
-});
+}
 
 
 async function initialUpsert(upsert: Function) {
