@@ -1,5 +1,7 @@
 # Figma Airtable Sync
 
+![figma-airtable-sync](./figma-airtable-sync-1.gif)
+
 Figma to Airtable because why not?
 
 Figma Airtable Sync is a plugin that syncs your Figma Designs with Airtable. It integrates two versatile tools to power some hopefully useful workflow.
